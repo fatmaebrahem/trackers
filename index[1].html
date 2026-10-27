@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>متتبع العادات</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d0d0d">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--cell:#e9ebef;--text:#14161a;--mute:#6b7280;--ac:#16a34a;--blue:#2563eb;--bd:#d6d9df;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d0d0d;--card:#181818;--cell:#262626;--text:#f3f4f6;--mute:#9ca3af;--ac:#4ade80;--blue:#6fa8ff;--bd:#333}}
+:root[data-theme="dark"]{--bg:#0d0d0d;--card:#181818;--cell:#262626;--text:#f3f4f6;--mute:#9ca3af;--ac:#4ade80;--blue:#6fa8ff;--bd:#333}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font-family:Arial,"Segoe UI",Tahoma,sans-serif;padding:12px;max-width:900px;margin:0 auto}
+h1{font-size:20px;margin:6px 0 10px}
+h2{font-size:15px;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:12px}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+button{font:inherit;cursor:pointer;border:1px solid var(--bd);background:var(--cell);color:var(--text);border-radius:10px;padding:8px 12px}
+button.p{background:var(--ac);color:#000;border:0;font-weight:bold}
+input{font:inherit;background:var(--cell);color:var(--text);border:1px solid var(--bd);border-radius:10px;padding:9px;flex:1;min-width:0}
+.add{display:flex;gap:8px}
+.today{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:var(--cell);margin-bottom:8px;cursor:pointer}
+.today .box{width:28px;height:28px;border-radius:8px;border:2px solid var(--mute);display:flex;align-items:center;justify-content:center;font-weight:bold;color:#000}
+.today.on .box{background:var(--ac);border-color:var(--ac)}
+.today.on .nm{text-decoration:line-through;color:var(--mute)}
+.nm{flex:1;font-weight:bold}.st{font-size:12px;color:var(--mute)}
+.x{padding:4px 9px;color:var(--mute)}
+.prog{height:10px;background:var(--cell);border-radius:6px;overflow:hidden;margin-top:6px}
+.prog i{display:block;height:100%;background:var(--ac)}
+.sc{overflow-x:auto;direction:ltr}
+table{border-collapse:separate;border-spacing:2px;direction:ltr}
+th{font-size:10px;color:var(--mute);font-weight:normal}
+td.n{position:sticky;left:0;background:var(--card);font-size:12px;font-weight:bold;white-space:nowrap;padding-right:8px;color:var(--blue);direction:rtl;text-align:right;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+td.c{width:22px;height:22px;background:var(--cell);border-radius:5px;cursor:pointer;text-align:center;font-size:12px;color:#000}
+td.c.on{background:var(--ac)}td.c.t{outline:2px solid var(--blue)}
+.cols{display:flex;align-items:flex-end;gap:2px;height:110px;direction:ltr}
+.cols div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;font-size:9px;color:var(--mute)}
+.cols div i{display:block;width:100%;background:var(--ac);border-radius:3px 3px 0 0;min-height:1px}
+.cols.w div{font-size:11px}
+.empty{color:var(--mute);text-align:center;padding:14px}
+</style>
+</head>
+<body>
+<h1>🎯 متتبع العادات</h1>
+
+<div class="card">
+  <div class="add"><input id="in" placeholder="اكتبي عادة جديدة… مثال: قرآن" maxlength="40"><button class="p" id="addb">إضافة</button></div>
+</div>
+
+<div class="card">
+  <h2>عادات النهارده <span id="td" class="st"></span></h2>
+  <div id="today"></div>
+  <div class="prog"><i id="tp" style="width:0%"></i></div>
+  <div class="st" id="tpt" style="margin-top:4px"></div>
+</div>
+
+<div class="card">
+  <div class="bar"><button id="nx">‹</button><b id="mt"></b><button id="pv">›</button></div>
+</div>
+
+<div class="card"><h2>جدول الشهر</h2><div class="sc"><table id="grid"></table></div></div>
+<div class="card"><h2>Daily Progress — التقدم اليومي</h2><div class="cols" id="daily"></div></div>
+<div class="card"><h2>Weekly Progress — التقدم الأسبوعي</h2><div class="cols w" id="weekly"></div></div>
+
+<script>
+const KEY="habit-tracker-v1";
+let S={habits:[],checks:{}};
+try{const r=localStorage.getItem(KEY);if(r)S=JSON.parse(r)}catch(e){}
+if(!S.habits.length&&!S.__seeded){S.habits=[{id:1,name:"مذاكرة"},{id:2,name:"قرآن"},{id:3,name:"رياضة"},{id:4,name:"شرب مية"}];S.__seeded=1}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const pad=n=>String(n).padStart(2,"0");
+const now=new Date();let Y=now.getFullYear(),M=now.getMonth();
+const key=(h,y,m,d)=>h+"|"+y+"-"+pad(m+1)+"-"+pad(d);
+const isOn=(h,y,m,d)=>!!S.checks[key(h,y,m,d)];
+const tog=(h,y,m,d)=>{const k=key(h,y,m,d);S.checks[k]?delete S.checks[k]:S.checks[k]=1;save();render()};
+const dim=(y,m)=>new Date(y,m+1,0).getDate();
+const months=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+function streak(h){let n=0,d=new Date();if(!isOn(h,d.getFullYear(),d.getMonth(),d.getDate()))d.setDate(d.getDate()-1);
+ while(isOn(h,d.getFullYear(),d.getMonth(),d.getDate())){n++;d.setDate(d.getDate()-1)}return n}
+function render(){
+ const ty=now.getFullYear(),tm=now.getMonth(),tdn=now.getDate();
+ document.getElementById("td").textContent="— "+tdn+" "+months[tm];
+ const t=document.getElementById("today");t.innerHTML="";
+ if(!S.habits.length)t.innerHTML='<div class="empty">ضيفي أول عادة من فوق 👆</div>';
+ let done=0;
+ S.habits.forEach(h=>{const on=isOn(h.id,ty,tm,tdn);if(on)done++;
+  const e=document.createElement("div");e.className="today"+(on?" on":"");
+  const s=streak(h.id);
+  e.innerHTML='<div class="box">'+(on?"✓":"")+'</div><div class="nm"></div><div class="st">'+(s?"🔥 "+s+" يوم":"")+'</div><button class="x" title="حذف">✕</button>';
+  e.querySelector(".nm").textContent=h.name;
+  e.onclick=()=>tog(h.id,ty,tm,tdn);
+  e.querySelector(".x").onclick=ev=>{ev.stopPropagation();if(confirm("حذف عادة «"+h.name+"»؟")){S.habits=S.habits.filter(x=>x.id!==h.id);save();render()}};
+  t.appendChild(e)});
+ const pc=S.habits.length?Math.round(done/S.habits.length*100):0;
+ document.getElementById("tp").style.width=pc+"%";
+ document.getElementById("tpt").textContent=done+" من "+S.habits.length+" — "+pc+"%";
+ document.getElementById("mt").textContent=months[M]+" "+Y;
+ const D=dim(Y,M),isNow=(Y===ty&&M===tm);
+ const g=document.getElementById("grid");let h="<tr><th></th>";
+ for(let d=1;d<=D;d++)h+="<th>"+d+"</th>";h+="<th>%</th></tr>";
+ S.habits.forEach(x=>{let c=0,row='<tr><td class="n"></td>';
+  for(let d=1;d<=D;d++){const on=isOn(x.id,Y,M,d);if(on)c++;
+   row+='<td class="c'+(on?" on":"")+(isNow&&d===tdn?" t":"")+'" data-h="'+x.id+'" data-d="'+d+'">'+(on?"✓":"")+"</td>"}
+  row+='<th>'+Math.round(c/D*100)+"%</th></tr>";h+=row});
+ g.innerHTML=h;
+ [...g.querySelectorAll("tr")].slice(1).forEach((tr,i)=>tr.querySelector(".n").textContent=S.habits[i].name);
+ g.querySelectorAll("td.c").forEach(td=>td.onclick=()=>tog(+td.dataset.h,Y,M,+td.dataset.d));
+ const dp=[];for(let d=1;d<=D;d++){dp.push(S.habits.length?S.habits.filter(x=>isOn(x.id,Y,M,d)).length/S.habits.length:0)}
+ document.getElementById("daily").innerHTML=dp.map((v,i)=>'<div><i style="height:'+Math.round(v*100)+'%"></i>'+(i+1)+"</div>").join("");
+ const wk=[[0,7],[7,14],[14,21],[21,28],[28,D]].filter(r=>r[0]<D);
+ document.getElementById("weekly").innerHTML=wk.map((r,i)=>{const a=dp.slice(r[0],r[1]);const v=a.reduce((s,x)=>s+x,0)/a.length;
+  return '<div><i style="height:'+Math.round(v*100)+'%"></i>W'+(i+1)+" · "+Math.round(v*100)+"%</div>"}).join("");
+}
+document.getElementById("addb").onclick=add;
+document.getElementById("in").onkeydown=e=>{if(e.key==="Enter")add()};
+function add(){const i=document.getElementById("in"),v=i.value.trim();if(!v)return;
+ S.habits.push({id:Date.now(),name:v});i.value="";save();render()}
+document.getElementById("pv").onclick=()=>{M++;if(M>11){M=0;Y++}render()};
+document.getElementById("nx").onclick=()=>{M--;if(M<0){M=11;Y--}render()};
+render();
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
